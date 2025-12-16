@@ -229,14 +229,13 @@
             { id: 3, name: "Sawah Blok C", temp: 27, airHum: 68, soilHum: 80, mode: 'auto', pump: false }
         ];
 
-        // Model Data Energi
         let energySystem = {
             battVoltage: 12.6,
-            battCapacityTotal: 1200, // Wh (Total Kapasitas)
-            battCapacityCurrent: 950, // Wh (Sisa)
+            battCapacityTotal: 1200, 
+            battCapacityCurrent: 950, 
             solarVoltage: 18.5,
             solarAmp: 4.2,
-            inverterLoad: 0 // Akan dihitung berdasarkan pompa yg nyala
+            inverterLoad: 0 
         };
 
         let soilChart;
@@ -257,20 +256,24 @@
             }
         }
 
-        function logout() { clearInterval(dataInterval); location.reload(); }
+        // FUNGSI LOGOUT YANG DIPERBAIKI (TIDAK RELOAD HALAMAN)
+        function logout() {
+            clearInterval(dataInterval);
+            document.getElementById('username').value = '';
+            document.getElementById('password').value = '';
+            document.getElementById('dashboard-view').style.display = 'none';
+            document.getElementById('login-view').style.display = 'flex';
+            switchTab('monitor');
+        }
 
         // --- NAVIGATION LOGIC ---
         function switchTab(tab) {
             currentTab = tab;
-            // Sembunyikan semua section
             document.getElementById('monitoring-section').style.display = 'none';
             document.getElementById('control-section').style.display = 'none';
             document.getElementById('energy-section').style.display = 'none';
-            
-            // Reset nav active classes
             document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
 
-            // Tampilkan yang dipilih
             if(tab === 'monitor') {
                 document.getElementById('monitoring-section').style.display = 'block';
                 document.getElementById('nav-monitor').classList.add('active');
@@ -286,25 +289,24 @@
             }
         }
 
-        // --- CORE SIMULATION LOOP ---
+        // --- CORE SIMULATION ---
         function initDashboard() {
-            const ctx = document.getElementById('soilChart').getContext('2d');
-            soilChart = new Chart(ctx, {
-                type: 'bar',
-                data: {
-                    labels: farms.map(f => f.name),
-                    datasets: [{
-                        label: 'Kelembaban Tanah (%)',
-                        data: farms.map(f => f.soilHum),
-                        backgroundColor: ['#2ecc71', '#3498db', '#f1c40f']
-                    }]
-                },
-                options: { responsive: true, scales: { y: { beginAtZero: true, max: 100 } } }
-            });
-
-            // Jalankan sekali
+            if (!soilChart) {
+                const ctx = document.getElementById('soilChart').getContext('2d');
+                soilChart = new Chart(ctx, {
+                    type: 'bar',
+                    data: {
+                        labels: farms.map(f => f.name),
+                        datasets: [{
+                            label: 'Kelembaban Tanah (%)',
+                            data: farms.map(f => f.soilHum),
+                            backgroundColor: ['#2ecc71', '#3498db', '#f1c40f']
+                        }]
+                    },
+                    options: { responsive: true, scales: { y: { beginAtZero: true, max: 100 } } }
+                });
+            }
             updateSimulation(); 
-            // Loop setiap 3 detik
             dataInterval = setInterval(updateSimulation, 3000); 
         }
 
@@ -312,55 +314,35 @@
             let totalTemp=0, totalAir=0, totalSoil=0;
             let activePumpsCount = 0;
 
-            // 1. UPDATE DATA SAWAH
             farms = farms.map((farm, i) => {
                 const newTemp = parseFloat((farm.temp + (Math.random() - 0.5)).toFixed(1));
                 const newSoil = Math.max(0, Math.min(100, farm.soilHum + (Math.floor(Math.random() * 4 - 2)))); 
-                
-                // Logic Auto
                 let currentPumpState = farm.pump;
                 if (farm.mode === 'auto') {
                     if (newSoil < 40) currentPumpState = true;
                     else if (newSoil > 80) currentPumpState = false;
                 }
-                
                 if(currentPumpState) activePumpsCount++;
-
-                totalTemp += newTemp;
-                totalAir += farm.airHum;
-                totalSoil += newSoil;
+                totalTemp += newTemp; totalAir += farm.airHum; totalSoil += newSoil;
                 soilChart.data.datasets[0].data[i] = newSoil;
-
                 return { ...farm, temp: newTemp, soilHum: newSoil, pump: currentPumpState };
             });
 
-            // 2. UPDATE DATA ENERGI
-            // Simulasi Solar PV (Volatilitas cahaya matahari)
-            energySystem.solarVoltage = parseFloat((18 + Math.random()).toFixed(1)); // 18V - 19V
-            energySystem.solarAmp = parseFloat((3 + Math.random() * 3).toFixed(1)); // 3A - 6A
-
-            // Hitung Beban Inverter (Misal 1 pompa = 150 Watt)
-            // Ada beban dasar sistem (CCTV/WiFi) misal 20 Watt
+            energySystem.solarVoltage = parseFloat((18 + Math.random()).toFixed(1));
+            energySystem.solarAmp = parseFloat((3 + Math.random() * 3).toFixed(1));
             const baseLoad = 20; 
             const pumpLoad = 150; 
             energySystem.inverterLoad = baseLoad + (activePumpsCount * pumpLoad);
 
-            // Simulasi Baterai (Kapasitas Wh berkurang jika beban tinggi, bertambah jika solar tinggi)
-            // Ini logika sederhana saja untuk demo
             const solarPower = energySystem.solarVoltage * energySystem.solarAmp;
             if (solarPower > energySystem.inverterLoad) {
-                // Charging
                 energySystem.battCapacityCurrent = Math.min(energySystem.battCapacityTotal, energySystem.battCapacityCurrent + 5);
             } else {
-                // Discharging
                 energySystem.battCapacityCurrent = Math.max(0, energySystem.battCapacityCurrent - 5);
             }
-            
-            // Tegangan Baterai mengikuti kapasitas (simplified)
             const percent = energySystem.battCapacityCurrent / energySystem.battCapacityTotal;
-            energySystem.battVoltage = (11.5 + (percent * 2)).toFixed(1); // 11.5V (0%) - 13.5V (100%)
+            energySystem.battVoltage = (11.5 + (percent * 2)).toFixed(1);
 
-            // 3. UPDATE HEADER UI
             document.getElementById('avg-temp').innerText = (totalTemp/3).toFixed(1);
             document.getElementById('avg-air').innerText = Math.floor(totalAir/3);
             document.getElementById('avg-soil').innerText = Math.floor(totalSoil/3);
@@ -368,13 +350,11 @@
 
             soilChart.update();
 
-            // 4. RENDER HALAMAN AKTIF
             if(currentTab === 'monitor') renderMonitoring();
             else if(currentTab === 'control') renderControl();
             else renderEnergy();
         }
 
-        // --- RENDERING FUNCTIONS ---
         function renderMonitoring() {
             const container = document.getElementById('monitor-container');
             container.innerHTML = '';
@@ -406,7 +386,6 @@
                 const btnDisabled = isAuto ? 'disabled' : '';
                 const activeOn = (!isAuto && farm.pump) ? 'pump-active' : ''; 
                 const activeOff = (!isAuto && !farm.pump) ? 'pump-active' : '';
-
                 container.innerHTML += `
                 <div class="col-md-4 mb-4">
                     <div class="card h-100">
@@ -430,26 +409,17 @@
         }
 
         function renderEnergy() {
-            // Hitung Daya PV
             const pvPower = (energySystem.solarVoltage * energySystem.solarAmp).toFixed(1);
-            
-            // Update Text
             document.getElementById('solar-volt').innerText = energySystem.solarVoltage;
             document.getElementById('solar-amp').innerText = energySystem.solarAmp;
             document.getElementById('solar-watt').innerText = pvPower;
-            
             document.getElementById('inv-watt').innerText = energySystem.inverterLoad;
-            
             document.getElementById('batt-volt').innerText = energySystem.battVoltage;
             document.getElementById('batt-wh').innerText = Math.floor(energySystem.battCapacityCurrent);
-
-            // Update Progress Bar Baterai
             const percentage = Math.floor((energySystem.battCapacityCurrent / energySystem.battCapacityTotal) * 100);
             const progressBar = document.getElementById('batt-progress');
             progressBar.style.width = percentage + '%';
             progressBar.innerText = percentage + '%';
-            
-            // Ubah warna bar baterai berdasarkan level
             progressBar.className = 'progress-bar progress-bar-striped progress-bar-animated';
             if(percentage > 50) progressBar.classList.add('bg-success');
             else if(percentage > 20) progressBar.classList.add('bg-warning');
