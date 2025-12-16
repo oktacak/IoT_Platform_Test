@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Farming - BayamFistra</title>
+    
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+    <style>
+        body {
+            background-color: #f4f6f9;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0; padding: 0;
+        }
+
+        /* --- LOGIN STYLE --- */
+        #login-view {
+            height: 100vh; display: flex; align-items: center; justify-content: center;
+            background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+        }
+        .login-card { width: 100%; max-width: 400px; border-radius: 15px; box-shadow: 0 15px 25px rgba(0,0,0,0.2); }
+        
+        /* --- DASHBOARD STYLE --- */
+        #dashboard-view { display: none; padding-bottom: 50px; }
+        .navbar { background-color: #2ecc71; }
+        .nav-link { color: rgba(255,255,255,0.8) !important; cursor: pointer; transition: 0.3s; }
+        .nav-link:hover { color: white !important; }
+        .nav-link.active { color: white !important; font-weight: bold; border-bottom: 3px solid white; background: rgba(255,255,255,0.1); border-radius: 5px 5px 0 0; }
+        
+        .card { border: none; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.05); }
+        .status-dot { height: 10px; width: 10px; border-radius: 50%; display: inline-block; margin-right: 5px; }
+        
+        /* Control Styles */
+        .btn-pump-on { background-color: #2ecc71; color: white; }
+        .btn-pump-off { background-color: #e74c3c; color: white; }
+        .pump-active { box-shadow: 0 0 15px rgba(46, 204, 113, 0.6); border: 2px solid #27ae60; }
+
+        /* Energy Styles */
+        .energy-value { font-size: 1.5rem; font-weight: bold; }
+        .unit { font-size: 0.8rem; color: #6c757d; }
+    </style>
+</head>
+<body>
+
+    <div id="login-view">
+        <div class="card login-card">
+            <div class="card-body p-4 bg-white text-center">
+                <i class="fas fa-leaf fa-3x text-success mb-3"></i>
+                <h4 class="fw-bold text-dark mb-1">BayamFistra</h4>
+                <p class="text-muted small mb-4">Sistem Monitoring & Kontrol Sawah</p>
+                <form onsubmit="handleLogin(event)">
+                    <div class="mb-3 text-start">
+                        <label class="form-label small fw-bold">Username</label>
+                        <input type="text" class="form-control" id="username" placeholder="admin" required>
+                    </div>
+                    <div class="mb-3 text-start">
+                        <label class="form-label small fw-bold">Password</label>
+                        <input type="password" class="form-control" id="password" placeholder="admin" required>
+                    </div>
+                    <div id="loginError" class="alert alert-danger py-2 small d-none">Username/Password Salah!</div>
+                    <button type="submit" class="btn btn-success w-100 fw-bold py-2">MASUK SISTEM</button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <div id="dashboard-view">
+        
+        <nav class="navbar navbar-expand-lg shadow-sm mb-4 sticky-top">
+            <div class="container">
+                <a class="navbar-brand text-white fw-bold" href="#"><i class="fas fa-leaf me-2"></i>BayamFistra</a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                
+                <div class="collapse navbar-collapse" id="navbarNav">
+                    <ul class="navbar-nav me-auto">
+                        <li class="nav-item">
+                            <a class="nav-link active" id="nav-monitor" onclick="switchTab('monitor')"><i class="fas fa-chart-line me-1"></i> Monitoring</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" id="nav-control" onclick="switchTab('control')"><i class="fas fa-cogs me-1"></i> Kontrol Irigasi</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-link" id="nav-energy" onclick="switchTab('energy')"><i class="fas fa-bolt me-1"></i> Sistem Energi</a>
+                        </li>
+                    </ul>
+                    <span class="text-white small me-3"><i class="fas fa-clock me-1"></i> <span id="last-update">-</span></span>
+                    <button onclick="logout()" class="btn btn-sm btn-light text-success fw-bold">Logout</button>
+                </div>
+            </div>
+        </nav>
+
+        <div class="container">
+            
+            <div id="monitoring-section">
+                <div class="row mb-4">
+                    <div class="col-md-4">
+                        <div class="card bg-warning text-white h-100">
+                            <div class="card-body d-flex justify-content-between align-items-center">
+                                <div><h6 class="small opacity-75">RATA SUHU</h6><h2 class="fw-bold m-0"><span id="avg-temp">0</span>°C</h2></div>
+                                <i class="fas fa-temperature-high fa-2x opacity-50"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-info text-white h-100">
+                            <div class="card-body d-flex justify-content-between align-items-center">
+                                <div><h6 class="small opacity-75">RATA KEL. UDARA</h6><h2 class="fw-bold m-0"><span id="avg-air">0</span>%</h2></div>
+                                <i class="fas fa-wind fa-2x opacity-50"></i>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-4">
+                        <div class="card bg-success text-white h-100">
+                            <div class="card-body d-flex justify-content-between align-items-center">
+                                <div><h6 class="small opacity-75">RATA KEL. TANAH</h6><h2 class="fw-bold m-0"><span id="avg-soil">0</span>%</h2></div>
+                                <i class="fas fa-water fa-2x opacity-50"></i>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card mb-4">
+                    <div class="card-body">
+                        <canvas id="soilChart" height="80"></canvas>
+                    </div>
+                </div>
+
+                <h5 class="text-secondary border-bottom pb-2 mb-3">Real-time Data Sawah</h5>
+                <div class="row" id="monitor-container"></div>
+            </div>
+
+            <div id="control-section" style="display: none;">
+                <h5 class="text-secondary border-bottom pb-2 mb-3">Pengaturan Mode & Kontrol Pompa</h5>
+                <div class="row" id="control-container"></div>
+            </div>
+
+            <div id="energy-section" style="display: none;">
+                <h5 class="text-secondary border-bottom pb-2 mb-3">Monitoring Power System (Solar PV & Baterai)</h5>
+                
+                <div class="row mb-4">
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100 border-start border-4 border-warning">
+                            <div class="card-header bg-white fw-bold text-warning">
+                                <i class="fas fa-solar-panel me-2"></i>Solar PV Input
+                            </div>
+                            <div class="card-body">
+                                <div class="row text-center">
+                                    <div class="col-4 border-end">
+                                        <div class="energy-value text-dark"><span id="solar-volt">0</span></div>
+                                        <div class="unit">Tegangan (V)</div>
+                                    </div>
+                                    <div class="col-4 border-end">
+                                        <div class="energy-value text-dark"><span id="solar-amp">0</span></div>
+                                        <div class="unit">Arus (A)</div>
+                                    </div>
+                                    <div class="col-4">
+                                        <div class="energy-value text-warning"><span id="solar-watt">0</span></div>
+                                        <div class="unit">Daya (Watt)</div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="col-md-6 mb-3">
+                        <div class="card h-100 border-start border-4 border-danger">
+                            <div class="card-header bg-white fw-bold text-danger">
+                                <i class="fas fa-plug me-2"></i>Inverter Output (Load)
+                            </div>
+                            <div class="card-body">
+                                <div class="row text-center">
+                                    <div class="col-6 border-end">
+                                        <div class="energy-value text-dark">220</div>
+                                        <div class="unit">Tegangan AC (V)</div>
+                                    </div>
+                                    <div class="col-6">
+                                        <div class="energy-value text-danger"><span id="inv-watt">0</span></div>
+                                        <div class="unit">Beban Daya (Watt)</div>
+                                    </div>
+                                </div>
+                                <div class="alert alert-light mt-3 mb-0 p-2 small text-center text-muted">
+                                    *Daya naik saat pompa menyala
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card border-start border-4 border-success">
+                    <div class="card-header bg-white fw-bold text-success">
+                        <i class="fas fa-car-battery me-2"></i>Status Baterai
+                    </div>
+                    <div class="card-body">
+                        <div class="row align-items-center">
+                            <div class="col-md-3 text-center mb-3 mb-md-0 border-end">
+                                <div class="energy-value"><span id="batt-volt">0</span></div>
+                                <div class="unit">Tegangan Baterai (V)</div>
+                            </div>
+                            <div class="col-md-3 text-center mb-3 mb-md-0 border-end">
+                                <div class="energy-value"><span id="batt-wh">0</span> / 1200</div>
+                                <div class="unit">Kapasitas (Wh)</div>
+                            </div>
+                            <div class="col-md-6">
+                                <label class="small text-muted mb-1">Level Baterai:</label>
+                                <div class="progress" style="height: 25px;">
+                                    <div id="batt-progress" class="progress-bar bg-success progress-bar-striped progress-bar-animated" role="progressbar" style="width: 0%;">
+                                        0%
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+
+    <script>
+        // --- DATA MODEL ---
+        let farms = [
+            { id: 1, name: "Sawah Blok A", temp: 28, airHum: 65, soilHum: 70, mode: 'auto', pump: false },
+            { id: 2, name: "Sawah Blok B", temp: 29, airHum: 60, soilHum: 45, mode: 'manual', pump: true },
+            { id: 3, name: "Sawah Blok C", temp: 27, airHum: 68, soilHum: 80, mode: 'auto', pump: false }
+        ];
+
+        // Model Data Energi
+        let energySystem = {
+            battVoltage: 12.6,
+            battCapacityTotal: 1200, // Wh (Total Kapasitas)
+            battCapacityCurrent: 950, // Wh (Sisa)
+            solarVoltage: 18.5,
+            solarAmp: 4.2,
+            inverterLoad: 0 // Akan dihitung berdasarkan pompa yg nyala
+        };
+
+        let soilChart;
+        let dataInterval;
+        let currentTab = 'monitor';
+
+        // --- AUTH LOGIC ---
+        function handleLogin(e) {
+            e.preventDefault();
+            const u = document.getElementById('username').value;
+            const p = document.getElementById('password').value;
+            if(u === 'admin' && p === 'admin') {
+                document.getElementById('login-view').style.display = 'none';
+                document.getElementById('dashboard-view').style.display = 'block';
+                initDashboard();
+            } else {
+                document.getElementById('loginError').classList.remove('d-none');
+            }
+        }
+
+        function logout() { clearInterval(dataInterval); location.reload(); }
+
+        // --- NAVIGATION LOGIC ---
+        function switchTab(tab) {
+            currentTab = tab;
+            // Sembunyikan semua section
+            document.getElementById('monitoring-section').style.display = 'none';
+            document.getElementById('control-section').style.display = 'none';
+            document.getElementById('energy-section').style.display = 'none';
+            
+            // Reset nav active classes
+            document.querySelectorAll('.nav-link').forEach(el => el.classList.remove('active'));
+
+            // Tampilkan yang dipilih
+            if(tab === 'monitor') {
+                document.getElementById('monitoring-section').style.display = 'block';
+                document.getElementById('nav-monitor').classList.add('active');
+                renderMonitoring();
+            } else if(tab === 'control') {
+                document.getElementById('control-section').style.display = 'block';
+                document.getElementById('nav-control').classList.add('active');
+                renderControl();
+            } else if(tab === 'energy') {
+                document.getElementById('energy-section').style.display = 'block';
+                document.getElementById('nav-energy').classList.add('active');
+                renderEnergy();
+            }
+        }
+
+        // --- CORE SIMULATION LOOP ---
+        function initDashboard() {
+            const ctx = document.getElementById('soilChart').getContext('2d');
+            soilChart = new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: farms.map(f => f.name),
+                    datasets: [{
+                        label: 'Kelembaban Tanah (%)',
+                        data: farms.map(f => f.soilHum),
+                        backgroundColor: ['#2ecc71', '#3498db', '#f1c40f']
+                    }]
+                },
+                options: { responsive: true, scales: { y: { beginAtZero: true, max: 100 } } }
+            });
+
+            // Jalankan sekali
+            updateSimulation(); 
+            // Loop setiap 3 detik
+            dataInterval = setInterval(updateSimulation, 3000); 
+        }
+
+        function updateSimulation() {
+            let totalTemp=0, totalAir=0, totalSoil=0;
+            let activePumpsCount = 0;
+
+            // 1. UPDATE DATA SAWAH
+            farms = farms.map((farm, i) => {
+                const newTemp = parseFloat((farm.temp + (Math.random() - 0.5)).toFixed(1));
+                const newSoil = Math.max(0, Math.min(100, farm.soilHum + (Math.floor(Math.random() * 4 - 2)))); 
+                
+                // Logic Auto
+                let currentPumpState = farm.pump;
+                if (farm.mode === 'auto') {
+                    if (newSoil < 40) currentPumpState = true;
+                    else if (newSoil > 80) currentPumpState = false;
+                }
+                
+                if(currentPumpState) activePumpsCount++;
+
+                totalTemp += newTemp;
+                totalAir += farm.airHum;
+                totalSoil += newSoil;
+                soilChart.data.datasets[0].data[i] = newSoil;
+
+                return { ...farm, temp: newTemp, soilHum: newSoil, pump: currentPumpState };
+            });
+
+            // 2. UPDATE DATA ENERGI
+            // Simulasi Solar PV (Volatilitas cahaya matahari)
+            energySystem.solarVoltage = parseFloat((18 + Math.random()).toFixed(1)); // 18V - 19V
+            energySystem.solarAmp = parseFloat((3 + Math.random() * 3).toFixed(1)); // 3A - 6A
+
+            // Hitung Beban Inverter (Misal 1 pompa = 150 Watt)
+            // Ada beban dasar sistem (CCTV/WiFi) misal 20 Watt
+            const baseLoad = 20; 
+            const pumpLoad = 150; 
+            energySystem.inverterLoad = baseLoad + (activePumpsCount * pumpLoad);
+
+            // Simulasi Baterai (Kapasitas Wh berkurang jika beban tinggi, bertambah jika solar tinggi)
+            // Ini logika sederhana saja untuk demo
+            const solarPower = energySystem.solarVoltage * energySystem.solarAmp;
+            if (solarPower > energySystem.inverterLoad) {
+                // Charging
+                energySystem.battCapacityCurrent = Math.min(energySystem.battCapacityTotal, energySystem.battCapacityCurrent + 5);
+            } else {
+                // Discharging
+                energySystem.battCapacityCurrent = Math.max(0, energySystem.battCapacityCurrent - 5);
+            }
+            
+            // Tegangan Baterai mengikuti kapasitas (simplified)
+            const percent = energySystem.battCapacityCurrent / energySystem.battCapacityTotal;
+            energySystem.battVoltage = (11.5 + (percent * 2)).toFixed(1); // 11.5V (0%) - 13.5V (100%)
+
+            // 3. UPDATE HEADER UI
+            document.getElementById('avg-temp').innerText = (totalTemp/3).toFixed(1);
+            document.getElementById('avg-air').innerText = Math.floor(totalAir/3);
+            document.getElementById('avg-soil').innerText = Math.floor(totalSoil/3);
+            document.getElementById('last-update').innerText = new Date().toLocaleTimeString();
+
+            soilChart.update();
+
+            // 4. RENDER HALAMAN AKTIF
+            if(currentTab === 'monitor') renderMonitoring();
+            else if(currentTab === 'control') renderControl();
+            else renderEnergy();
+        }
+
+        // --- RENDERING FUNCTIONS ---
+        function renderMonitoring() {
+            const container = document.getElementById('monitor-container');
+            container.innerHTML = '';
+            farms.forEach(farm => {
+                const pumpStatus = farm.pump ? '<span class="badge bg-primary">Menyiram</span>' : '<span class="badge bg-secondary">Standby</span>';
+                const modeBadge = farm.mode === 'auto' ? '<span class="badge bg-info text-dark">AUTO</span>' : '<span class="badge bg-dark">MANUAL</span>';
+                container.innerHTML += `
+                <div class="col-md-4 mb-3">
+                    <div class="card h-100 border-start border-4 ${farm.pump ? 'border-primary' : 'border-success'}">
+                        <div class="card-body">
+                            <div class="d-flex justify-content-between mb-2"><h6 class="fw-bold">${farm.name}</h6><div>${modeBadge}</div></div>
+                            <div class="row text-center mt-3">
+                                <div class="col-4 border-end"><small class="d-block text-muted">Suhu</small><strong>${farm.temp}°</strong></div>
+                                <div class="col-4 border-end"><small class="d-block text-muted">Udara</small><strong>${farm.airHum}%</strong></div>
+                                <div class="col-4"><small class="d-block text-muted">Tanah</small><strong>${farm.soilHum}%</strong></div>
+                            </div>
+                            <div class="mt-3 text-center"><small class="text-muted">Status Pompa:</small> ${pumpStatus}</div>
+                        </div>
+                    </div>
+                </div>`;
+            });
+        }
+
+        function renderControl() {
+            const container = document.getElementById('control-container');
+            container.innerHTML = '';
+            farms.forEach((farm, index) => {
+                const isAuto = farm.mode === 'auto';
+                const btnDisabled = isAuto ? 'disabled' : '';
+                const activeOn = (!isAuto && farm.pump) ? 'pump-active' : ''; 
+                const activeOff = (!isAuto && !farm.pump) ? 'pump-active' : '';
+
+                container.innerHTML += `
+                <div class="col-md-4 mb-4">
+                    <div class="card h-100">
+                        <div class="card-header bg-white fw-bold d-flex justify-content-between align-items-center">
+                            ${farm.name}
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" id="modeSwitch${index}" ${isAuto ? 'checked' : ''} onchange="toggleMode(${index})">
+                                <label class="form-check-label small" for="modeSwitch${index}">${isAuto ? 'AUTO' : 'MANUAL'}</label>
+                            </div>
+                        </div>
+                        <div class="card-body text-center">
+                            <i class="fas fa-faucet fa-3x mb-3 ${farm.pump ? 'text-primary' : 'text-secondary'}"></i>
+                            <div class="d-grid gap-2 d-md-block">
+                                <button onclick="setPump(${index}, true)" class="btn btn-pump-on btn-sm px-4 ${activeOn}" ${btnDisabled}>ON</button>
+                                <button onclick="setPump(${index}, false)" class="btn btn-pump-off btn-sm px-4 ${activeOff}" ${btnDisabled}>OFF</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
+            });
+        }
+
+        function renderEnergy() {
+            // Hitung Daya PV
+            const pvPower = (energySystem.solarVoltage * energySystem.solarAmp).toFixed(1);
+            
+            // Update Text
+            document.getElementById('solar-volt').innerText = energySystem.solarVoltage;
+            document.getElementById('solar-amp').innerText = energySystem.solarAmp;
+            document.getElementById('solar-watt').innerText = pvPower;
+            
+            document.getElementById('inv-watt').innerText = energySystem.inverterLoad;
+            
+            document.getElementById('batt-volt').innerText = energySystem.battVoltage;
+            document.getElementById('batt-wh').innerText = Math.floor(energySystem.battCapacityCurrent);
+
+            // Update Progress Bar Baterai
+            const percentage = Math.floor((energySystem.battCapacityCurrent / energySystem.battCapacityTotal) * 100);
+            const progressBar = document.getElementById('batt-progress');
+            progressBar.style.width = percentage + '%';
+            progressBar.innerText = percentage + '%';
+            
+            // Ubah warna bar baterai berdasarkan level
+            progressBar.className = 'progress-bar progress-bar-striped progress-bar-animated';
+            if(percentage > 50) progressBar.classList.add('bg-success');
+            else if(percentage > 20) progressBar.classList.add('bg-warning');
+            else progressBar.classList.add('bg-danger');
+        }
+
+        function toggleMode(index) {
+            farms[index].mode = farms[index].mode === 'auto' ? 'manual' : 'auto';
+            if(farms[index].mode === 'manual') farms[index].pump = false;
+            renderControl();
+        }
+
+        function setPump(index, state) {
+            if(farms[index].mode === 'manual') {
+                farms[index].pump = state;
+                renderControl();
+            }
+        }
+    </script>
+</body>
+</html>
